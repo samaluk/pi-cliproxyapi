@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # npm trusted publishing (OIDC) and provenance
 
 jobs:
   publish:
@@ -33,7 +34,10 @@ jobs:
             echo "Tag must match package.json version v$version." >&2
             exit 1
           fi
-      - name: Publish to npm with Bun
-        run: bun publish --registry https://registry.npmjs.org --access public
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Bun builds; pnpm only uploads, because Bun cannot use npm trusted publishing (OIDC).
+      # pm-on-fail=ignore: the project pins packageManager to bun; pnpm is used solely for the upload.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: '12.23.0'
+      - name: Publish to npm with trusted publishing
+        run: pnpm publish --registry https://registry.npmjs.org --access public --no-git-checks --ignore-scripts --config.pm-on-fail=ignore

@@ -72,6 +72,6 @@ For the first release, create a short-lived [granular access token](https://docs
 )
 ```
 
-For automated releases, create a granular token limited to this package with **Read and write (publish and stage)** and **Bypass 2FA** enabled. Save it as the `NPM_TOKEN` repository secret in GitHub Actions. Bump the version in `package.json`, push the commit, and push a matching tag such as `v0.1.1`.
+For automated releases, add a trusted publisher once the package exists: on npmjs.com open the package's **Settings → Trusted publishing**, choose **GitHub Actions**, and enter owner `samaluk`, repository `pi-cliproxyapi` and workflow `release.yml`, leaving the environment blank. Then bump the version in `package.json`, push the commit, and push a matching tag such as `v0.1.1`.
 
-Bun 1.4.5 uses token authentication and publishes without provenance. npm [plans to retire direct publishing with granular tokens in January 2027](https://docs.npmjs.com/about-access-tokens#direct-publishing-is-being-deprecated).
+The release workflow builds and tests with Bun and uploads with `pnpm publish`, which uses npm trusted publishing (GitHub Actions OIDC) and attaches provenance. No npm token or repository secret is needed. Bun 1.4.5 cannot use trusted publishing, and npm [retires direct publishing with granular tokens in January 2027](https://docs.npmjs.com/about-access-tokens#direct-publishing-is-being-deprecated).
