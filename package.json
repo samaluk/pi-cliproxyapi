@@ -1,6 +1,6 @@
 {
   "name": "@samaluk/pi-cliproxyapi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Live CLIProxyAPI model discovery for Pi 1",
   "license": "MIT",
   "type": "module",
