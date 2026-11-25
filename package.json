@@ -23,8 +23,8 @@
     "model discovery"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-ai": "^1.6.0",
-    "@earendil-works/pi-coding-agent": "^1.6.0"
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
   },
   "pi": {
     "extensions": [
@@ -44,8 +44,7 @@
   },
   "packageManager": "bun@1.4.5",
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",

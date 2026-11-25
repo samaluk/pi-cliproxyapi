@@ -10,9 +10,6 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -20,7 +17,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -29,12 +25,15 @@ jobs:
       - run: bun run check
       - run: bun test
       - run: bun run build
-      - run: npm pack --dry-run
+      - run: bun pm pack --dry-run
       - name: Check tag matches package version
         run: |
-          version=$(node -p "require('./package.json').version")
+          version=$(bun -p "require('./package.json').version")
           if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
             echo "Tag must match package.json version v$version." >&2
             exit 1
           fi
-      - run: npm publish --provenance --access public
+      - name: Publish to npm with Bun
+        run: bun publish --registry https://registry.npmjs.org --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -8,9 +8,13 @@ Use Node.js 22.19 or later and a CLIProxyAPI gateway that supports the transport
 
 ## Install
 
+Use the [Pi package manager](https://github.com/earendil-works/pi/blob/v1.6.0/packages/coding-agent/docs/packages.md#install-and-manage-packages).
+
 ```sh
 pi install npm:@samaluk/pi-cliproxyapi@0.1.0
 ```
+
+Pi records the package in your personal `settings.json`. Add `--local` to install it for a trusted project.
 
 Set `CLIPROXYAPI_BASE_URL` to your gateway URL, for example `https://gateway.example`, and supply its bearer token through `CLIPROXYAPI_API_KEY` in Pi's environment. Run `pi --list-models` to check discovery or select a model in Pi with `/model`.
 
@@ -51,16 +55,23 @@ If the rich endpoint is unsupported or returns a plain model list, the extension
 
 ## Releasing
 
-The first npm publish must be manual because trusted publishing can only be configured once the package exists. From the repository root, use Bun 1.4.5 and current npm.
+For the first release, create a short-lived [granular access token](https://docs.npmjs.com/creating-and-viewing-access-tokens) on npmjs.com with **Read and write (publish and stage)** access to the `@samaluk` scope. Leave **Bypass 2FA** off. Run these commands from the repository root with Bun 1.4.5. Paste the token when prompted. Bun opens a browser for two-factor authentication if npm requests it. For a one-time code, append `--otp <code>` to the publish command.
 
 ```sh
-npm login --registry https://registry.npmjs.org
-bun install --frozen-lockfile
-bun run check
-bun test
-bun run build
-npm pack --dry-run
-npm publish --registry https://registry.npmjs.org --access public --no-provenance
+(
+  bun install --frozen-lockfile &&
+  bun run check &&
+  bun test &&
+  bun run build &&
+  bun pm pack --dry-run &&
+  printf 'npm publish token: ' &&
+  IFS= read -rs npm_publish_token &&
+  printf '\n' &&
+  NPM_CONFIG_USERCONFIG=/dev/null NPM_CONFIG_TOKEN="${npm_publish_token:?Token required}" \
+    bun publish --no-env-file --registry https://registry.npmjs.org --access public
+)
 ```
 
-When you're ready for the next release, open the package's settings on npmjs.com and add a GitHub Actions trusted publisher for `samaluk/pi-cliproxyapi` with workflow filename `release.yml`. Leave the environment field blank and enable direct `npm publish` under Allowed actions. Bump `package.json`, push the commit, and push a matching `v<version>` tag (for example, `v0.1.1`). Complete the first trusted publish within two days of adding the publisher. The release workflow uses OIDC and publishes with provenance.
+For automated releases, create a granular token limited to this package with **Read and write (publish and stage)** and **Bypass 2FA** enabled. Save it as the `NPM_TOKEN` repository secret in GitHub Actions. Bump the version in `package.json`, push the commit, and push a matching tag such as `v0.1.1`.
+
+Bun 1.4.5 uses token authentication and publishes without provenance. npm [plans to retire direct publishing with granular tokens in January 2027](https://docs.npmjs.com/about-access-tokens#direct-publishing-is-being-deprecated).

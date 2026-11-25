@@ -1,21 +1,22 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ThinkingLevel, ThinkingLevelMap } from "@earendil-works/pi-ai";
-import { getApiProvider } from "@earendil-works/pi-ai/compat";
-import { getAgentDir, type ExtensionFactory, type ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import type { Model, Provider, ThinkingLevel, ThinkingLevelMap } from "@earendil-works/pi-ai";
+import { openAICompletionsApi, openAIResponsesApi } from "@earendil-works/pi-ai/compat";
+import { getAgentDir, type ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import {
   createDiscovery, defaultCacheDir, gatewayFetch, providerID, record, resolveConnection, stringOption,
   warnOnDiscoveryStatus, type CatalogModel,
 } from "./catalog";
 
 const packageName = "pi-cliproxyapi";
+type GatewayApi = "openai-responses" | "openai-completions";
 
 export interface PiOptions {
   providerId?: string;
   name?: string;
   baseUrl?: string;
   apiKey?: string;
-  api?: "openai-responses" | "openai-completions";
+  api?: GatewayApi;
   cacheDir?: string;
 }
 
@@ -31,7 +32,7 @@ async function readOptions(): Promise<Record<string, unknown>> {
   }
 }
 
-function toModel(row: CatalogModel): ProviderModelConfig {
+function toModel(row: CatalogModel, provider: string, baseUrl: string, api: GatewayApi): Model<GatewayApi> {
   const supported = new Set(row.efforts);
   const thinkingLevelMap: ThinkingLevelMap = {
     off: supported.has("none") ? "none" : null,
@@ -45,6 +46,9 @@ function toModel(row: CatalogModel): ProviderModelConfig {
   return {
     id: row.id,
     name: row.name,
+    provider,
+    baseUrl,
+    api,
     contextWindow: row.contextWindow,
     maxTokens: row.maxTokens,
     input: row.input.filter((modality) => modality === "text" || modality === "image"),
@@ -65,32 +69,52 @@ export function createExtension(overrides: PiOptions = {}): ExtensionFactory {
     const cacheDir = stringOption(options.cacheDir, "cacheDir") ?? defaultCacheDir(packageName);
     const discover = createDiscovery(connection, cacheDir);
     const report = warnOnDiscoveryStatus(packageName);
-    let defaults = new Map<string, CatalogModel["defaultEffort"]>();
+    const native = api === "openai-responses" ? openAIResponsesApi() : openAICompletionsApi();
 
-    const refresh = async (signal?: AbortSignal) => {
+    const loadCatalog = async (signal?: AbortSignal) => {
       const result = await discover(signal);
       report(result);
-      defaults = new Map(result.catalog.models.map(({ id, defaultEffort }) => [id, defaultEffort]));
-      return result.catalog.models.map(toModel);
+      return {
+        models: result.catalog.models.map((row) => toModel(row, id, connection.baseUrl, api)),
+        defaults: new Map(result.catalog.models.map(({ id, defaultEffort }) => [id, defaultEffort])),
+      };
     };
-    let models: ProviderModelConfig[] = [];
+    let catalog: Awaited<ReturnType<typeof loadCatalog>> | undefined;
     try {
-      models = await refresh();
+      catalog = await loadCatalog();
     } catch {
       report();
     }
 
-    pi.registerProvider(id, {
+    const provider: Provider = {
+      id,
       name,
       baseUrl: connection.baseUrl,
-      api,
-      apiKey: overrides.apiKey ?? "$CLIPROXYAPI_API_KEY",
-      models,
-      refreshModels: ({ signal }) => refresh(signal),
+      auth: {
+        apiKey: {
+          name: `${name} API key`,
+          async resolve() {
+            return {
+              auth: { apiKey: connection.apiKey },
+              source: overrides.apiKey ? "extension options" : "CLIPROXYAPI_API_KEY",
+            };
+          },
+        },
+      },
+      getModels: () => catalog?.models ?? [],
+      async refreshModels({ allowNetwork, publish, signal }) {
+        if (!allowNetwork) return;
+        const next = await loadCatalog(signal);
+        await publish({ update: () => { catalog = next; } });
+      },
+      stream(model, context, streamOptions) {
+        return native.stream(model, context, {
+          ...streamOptions,
+          fetch: gatewayFetch(connection, streamOptions?.fetch) as typeof fetch,
+        });
+      },
       streamSimple(model, context, streamOptions) {
-        const native = getApiProvider(api);
-        if (!native) throw new Error("Pi did not load the configured CLIProxyAPI transport");
-        const effort = defaults.get(model.id);
+        const effort = catalog?.defaults.get(model.id);
         // An explicit Pi level, including an advertised off, takes precedence over the gateway default.
         const fallback = effort && model.thinkingLevelMap?.off === null
           ? Object.entries(model.thinkingLevelMap).find(([, mapped]) => mapped === effort)?.[0] as ThinkingLevel | undefined
@@ -101,7 +125,8 @@ export function createExtension(overrides: PiOptions = {}): ExtensionFactory {
           fetch: gatewayFetch(connection, streamOptions?.fetch) as typeof fetch,
         });
       },
-    });
+    };
+    pi.registerProvider(provider);
   };
 }
 
