@@ -1,0 +1,61 @@
+{
+  "name": "@samaluk/pi-cliproxyapi",
+  "version": "0.1.0",
+  "description": "Live CLIProxyAPI model discovery for Pi 1",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pi",
+    "pi-package",
+    "cliproxyapi",
+    "model discovery"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "^1.6.0",
+    "@earendil-works/pi-coding-agent": "^1.6.0"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samaluk/pi-cliproxyapi.git"
+  },
+  "homepage": "https://github.com/samaluk/pi-cliproxyapi#readme",
+  "bugs": {
+    "url": "https://github.com/samaluk/pi-cliproxyapi/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "bun@1.4.5",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.5",
+    "typescript": "5.9.3",
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-coding-agent": "1.6.0"
+  }
+}
